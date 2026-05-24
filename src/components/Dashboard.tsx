@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
+import { roomQueries } from "@/lib/queries";
 import { useToast } from "@/hooks/use-toast";
 import ProjectDetailsModal from "./ProjectDetailsModal";
 import { MaterialTracker } from "./MaterialTracker";
@@ -20,7 +21,7 @@ import {
   Search, 
   Home, 
   Calendar, 
-  DollarSign, 
+  DollarSign,
   Ruler,
   MapPin,
   Phone,
@@ -74,6 +75,7 @@ export default function Dashboard() {
   const [userName, setUserName] = useState<string>("");
   const [avatarUrl, setAvatarUrl] = useState<string>("");
   const [userInitials, setUserInitials] = useState<string>("");
+  const [projectHasMeasurements, setProjectHasMeasurements] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const stored = localStorage.getItem('dealerInfo');
@@ -120,6 +122,18 @@ export default function Dashboard() {
       
       if (profile?.avatar_url) {
         setAvatarUrl(profile.avatar_url);
+      }
+
+      // Fetch dealer info from database
+      const { data: dealer } = await supabase
+        .from('dealer_info')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (dealer) {
+        setDealerInfo(dealer);
+        localStorage.setItem('dealerInfo', JSON.stringify(dealer));
       }
     }
   };
@@ -231,7 +245,7 @@ export default function Dashboard() {
         description: "Failed to load projects",
         variant: "destructive",
       });
-    } else if (data) {
+      } else if (data) {
       // Deduplicate projects by phone number (unique per customer)
       const statusPriority: Record<string, number> = { 'Quoted': 3, 'In Progress': 2 };
       const uniqueMap = new Map();
@@ -261,11 +275,32 @@ export default function Dashboard() {
 
       const uniqueProjects = Array.from(uniqueMap.values());
       setProjects(uniqueProjects);
+
+      // Load a small map of which projects have room measurements so the UI
+      // can optionally show/hide labour & material trackers in the front phase.
+      (async () => {
+        try {
+          const map: Record<string, boolean> = {};
+          await Promise.all(uniqueProjects.map(async (p: Project) => {
+            try {
+              const { data: rooms } = await roomQueries.getRoomsByProjectId(p.id);
+              map[p.id] = !!(rooms && rooms.length > 0);
+            } catch (e) {
+              map[p.id] = false;
+            }
+          }));
+          setProjectHasMeasurements(map);
+        } catch (e) {
+          // keep default empty map on error
+          setProjectHasMeasurements({});
+        }
+      })();
     } else {
       setProjects([]);
     }
     setLoading(false);
   };
+
 
   const fetchLeadStats = async () => {
     try {
@@ -537,9 +572,9 @@ const handleEditProject = async (projectId: string) => {
               onChange={handleAvatarUpload}
             />
             <div>
-              <h1 className="text-xl font-semibold">{userName || 'User'}</h1>
+              <h1 className="text-xl font-semibold">{dealerInfo?.dealer_name || 'Your Business'}</h1>
               <p className="text-white/80 text-sm">
-                {dealerInfo ? `${dealerInfo.shopName} • ${dealerInfo.dealerName}` : 'Welcome back!'}
+                {userName || 'User'}
               </p>
             </div>
           </div>
@@ -579,8 +614,8 @@ const handleEditProject = async (projectId: string) => {
             <CardContent className="p-4">
               <DollarSign className="h-6 w-6 text-secondary mx-auto mb-2" />
               <p className="text-2xl font-bold text-foreground">
-                ₹{totalValue >= 100000 
-                  ? `${(totalValue / 100000).toFixed(1)}L` 
+                ₹{totalValue >= 100000
+                  ? `${(totalValue / 100000).toFixed(1)}L`
                   : `${(totalValue / 1000).toFixed(0)}K`}
               </p>
               <p className="text-sm text-muted-foreground">Total Value</p>
@@ -608,18 +643,7 @@ const handleEditProject = async (projectId: string) => {
             </div>
           </Button>
           
-          <Button 
-            onClick={() => navigate("/dealer-pricing")}
-            variant="outline"
-            className="flex-1 min-w-[100px] h-14 sm:h-16 bg-card hover:bg-muted text-foreground eca-shadow hover:shadow-lg transition-all rounded-lg border-border"
-          >
-            <div className="flex items-center gap-1.5 sm:gap-2 w-full justify-center px-2">
-              <Package className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0 text-foreground" />
-              <span className="font-semibold text-[10px] sm:text-xs whitespace-nowrap">Manage Pricing</span>
-            </div>
-          </Button>
-
-          <Button 
+          <Button
             onClick={() => navigate("/lead-book")}
             variant="outline"
             className="flex-1 min-w-[100px] h-14 sm:h-16 bg-card hover:bg-muted text-foreground eca-shadow hover:shadow-lg transition-all rounded-lg border-border"
@@ -727,8 +751,7 @@ const handleEditProject = async (projectId: string) => {
                         <span className="text-sm text-muted-foreground">{project.project_type}</span>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-medium text-foreground">₹{Math.round(project.quotation_value).toLocaleString()}</p>
-                        <p className="text-xs text-muted-foreground">{Math.round(project.area_sqft)} sq.ft</p>
+                        <p className="text-sm font-medium text-foreground">{Math.round(project.area_sqft)} sq.ft</p>
                       </div>
                     </div>
 
@@ -863,27 +886,29 @@ const handleEditProject = async (projectId: string) => {
                               )}
                             </div>
 
-                            <div className="flex items-center gap-2">
-                              <Button 
-                                size="sm" 
-                                variant="ghost"
-                                className="h-8 w-8 p-0 rounded-md hover:bg-muted"
-                                onClick={() => handleOpenLabourTracker(project.id)}
-                                title="Labour Tracker"
-                              >
-                                <Users className="h-4 w-4 text-red-500" />
-                              </Button>
+                             {projectHasMeasurements[project.id] ? (
+                               <div className="flex items-center gap-2">
+                                 <Button
+                                   size="sm"
+                                   variant="ghost"
+                                   className="h-8 w-8 p-0 rounded-md hover:bg-muted"
+                                   onClick={() => handleOpenLabourTracker(project.id)}
+                                   title="Labour Tracker"
+                                 >
+                                   <Users className="h-4 w-4 text-red-500" />
+                                 </Button>
 
-                              <Button 
-                                size="sm" 
-                                variant="ghost"
-                                className="h-8 w-8 p-0 rounded-md hover:bg-muted"
-                                onClick={() => handleOpenMaterialTracker(project.id)}
-                                title="Material Tracker"
-                              >
-                                <Package className="h-4 w-4 text-purple-500" />
-                              </Button>
-                            </div>
+                                 <Button
+                                   size="sm"
+                                   variant="ghost"
+                                   className="h-8 w-8 p-0 rounded-md hover:bg-muted"
+                                   onClick={() => handleOpenMaterialTracker(project.id)}
+                                   title="Material Tracker"
+                                 >
+                                   <Package className="h-4 w-4 text-purple-500" />
+                                 </Button>
+                               </div>
+                             ) : null}
                           </div>
                         </>
                       )}

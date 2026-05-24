@@ -1486,7 +1486,7 @@ export default function PaintEstimationScreen() {
   const getTotalPaintArea = () => {
     return areaConfigurations.filter(c => c.areaType === 'Floor' || c.areaType === 'Wall' || c.areaType === 'Ceiling').reduce((total, config) => total + (config.area || 0), 0);
   };
-  const handleContinue = async () => {
+  const handleSaveProject = async () => {
     // Validate at least one configuration is complete across all paint types
     const allConfigs = [...interiorConfigurations, ...exteriorConfigurations, ...waterproofingConfigurations];
     const hasValidConfig = allConfigs.some(config => config.paintingSystem && config.perSqFtRate);
@@ -1497,7 +1497,7 @@ export default function PaintEstimationScreen() {
     try {
       setIsCalculating(true);
 
-      // Save configurations to cache immediately for fast UI
+      // Save configurations to cache
       const updatedData = {
         interiorConfigurations: interiorConfigurations,
         exteriorConfigurations: exteriorConfigurations,
@@ -1507,42 +1507,56 @@ export default function PaintEstimationScreen() {
       };
       localStorage.setItem(`estimation_${projectId}`, JSON.stringify(updatedData));
 
-      // Call backend function to pre-calculate summary (async, don't block navigation)
       const {
         data: {
           session
         }
       } = await supabase.auth.getSession();
-      if (session) {
-        // Fire and forget - don't wait for backend
-        supabase.functions.invoke('get-project-summary', {
-          body: {
-            project_id: projectId,
-            configurations: updatedData
-          }
-        }).then(({
-          data,
-          error
-        }) => {
-          if (!error && data) {
-            localStorage.setItem(`project_summary_${projectId}`, JSON.stringify(data));
-            console.log('Backend calculation complete, summary cached');
-          }
-        }).catch(err => {
-          console.warn('Backend calculation failed, using client-side fallback:', err);
-        });
+      if (!session) {
+        toast.error('Please log in to save the project');
+        setIsCalculating(false);
+        return;
       }
-      setIsCalculating(false);
 
-      // Navigate immediately - don't wait for backend
-      navigate(`/generate-summary/${projectId}`);
-    } catch (error) {
-      console.error('Error in handleContinue:', error);
-      setIsCalculating(false);
-      toast.success('Loading your project summary...');
+      // Update project status to completed
+      const { error: updateError } = await supabase
+        .from('projects')
+        .update({
+          status: 'completed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', projectId)
+        .eq('user_id', session.user.id);
 
-      // Navigate anyway to prevent blank screen
-      navigate(`/generate-summary/${projectId}`);
+      if (updateError) {
+        console.error('Error updating project:', updateError);
+        toast.error('Failed to save project');
+        setIsCalculating(false);
+        return;
+      }
+
+      // Store paint configurations in the project
+      const { error: configError } = await supabase
+        .from('projects')
+        .update({
+          paint_configurations: updatedData
+        })
+        .eq('id', projectId)
+        .eq('user_id', session.user.id);
+
+      if (configError) {
+        console.warn('Warning: Failed to store paint configurations:', configError);
+      }
+
+      setIsCalculating(false);
+      toast.success('Project saved successfully!');
+
+      // Navigate to dashboard
+      navigate('/dashboard');
+    } catch (error: any) {
+      console.error('Error saving project:', error);
+      setIsCalculating(false);
+      toast.error(error.message || 'Failed to save project');
     }
   };
 
@@ -2569,14 +2583,14 @@ export default function PaintEstimationScreen() {
         </DialogContent>
       </Dialog>
 
-      {/* Fixed Bottom Button */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t border-border">
-        <Button className="w-full h-12 text-base font-medium" onClick={handleContinue} disabled={!areaConfigurations.some(c => c.paintingSystem && c.perSqFtRate) || isCalculating}>
-          {isCalculating ? <div className="flex items-center gap-2">
-              <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              <span>Generating...</span>
-            </div> : 'Generate Summary'}
-        </Button>
+       {/* Fixed Bottom Button */}
+       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t border-border">
+         <Button className="w-full h-12 text-base font-medium" onClick={handleSaveProject} disabled={!areaConfigurations.some(c => c.paintingSystem && c.perSqFtRate) || isCalculating}>
+           {isCalculating ? <div className="flex items-center gap-2">
+               <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+               <span>Saving...</span>
+             </div> : 'Save Project'}
+         </Button>
       </div>
     </div>;
 }

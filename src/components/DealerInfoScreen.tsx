@@ -5,11 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Store, User, Phone, MapPin, Mail, Percent } from "lucide-react";
+import { Phone, MapPin, Mail } from "lucide-react";
 import cosvysLogo from "@/assets/cosvys-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { dealerInfoSchema } from "@/lib/validations";
 
 export default function DealerInfoScreen() {
   const navigate = useNavigate();
@@ -17,13 +16,11 @@ export default function DealerInfoScreen() {
   const [loading, setLoading] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState({
-    dealerName: "",
-    shopName: "",
-    employeeId: "",
+    name: "",
     phone: "",
-    address: "",
     email: "",
-    margin: ""
+    shopName: "",
+    address: ""
   });
 
   useEffect(() => {
@@ -42,19 +39,17 @@ export default function DealerInfoScreen() {
         .eq('user_id', session.user.id)
         .maybeSingle();
       
-      if (dealerInfo) {
-        // Load existing data for editing
-        setIsEditMode(true);
-        setFormData({
-          dealerName: dealerInfo.dealer_name || "",
-          shopName: dealerInfo.shop_name || "",
-          employeeId: dealerInfo.employee_id || "",
-          phone: dealerInfo.phone || "",
-          address: dealerInfo.address || "",
-          email: dealerInfo.email || "",
-          margin: dealerInfo.margin?.toString() || ""
-        });
-      }
+       if (dealerInfo) {
+         // Load existing data for editing
+         setIsEditMode(true);
+         setFormData({
+           name: dealerInfo.dealer_name || "",
+           phone: dealerInfo.phone || "",
+           email: dealerInfo.email || "",
+           shopName: dealerInfo.shop_name || "",
+           address: dealerInfo.address || ""
+         });
+       }
     };
     checkAuth();
   }, [navigate]);
@@ -64,11 +59,19 @@ export default function DealerInfoScreen() {
     setLoading(true);
 
     try {
-      // Validate form data
-      const validated = dealerInfoSchema.parse({
-        ...formData,
-        margin: parseFloat(formData.margin)
-      });
+      // Validate required fields
+      if (!formData.name.trim()) {
+        throw new Error("Name is required");
+      }
+      if (!formData.phone || formData.phone.length !== 10) {
+        throw new Error("Please enter a valid 10-digit phone number");
+      }
+      if (!formData.shopName.trim()) {
+        throw new Error("Shop Name is required");
+      }
+      if (!formData.address.trim()) {
+        throw new Error("Address is required");
+      }
 
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -80,13 +83,11 @@ export default function DealerInfoScreen() {
         const { error } = await supabase
           .from('dealer_info')
           .update({
-            dealer_name: validated.dealerName,
-            shop_name: validated.shopName,
-            employee_id: validated.employeeId,
-            phone: validated.phone,
-            address: validated.address,
-            email: validated.email || null,
-            margin: validated.margin
+            dealer_name: formData.name,
+            phone: formData.phone,
+            email: formData.email || null,
+            address: formData.address,
+            shop_name: formData.shopName
           })
           .eq('user_id', session.user.id);
 
@@ -94,37 +95,35 @@ export default function DealerInfoScreen() {
 
         toast({
           title: "Success",
-          description: "Dealer information updated successfully!",
+          description: "Information updated successfully!",
         });
 
-        navigate("/settings");
+        navigate("/dashboard");
       } else {
         // Insert new dealer info
-        const { error } = await supabase
-          .from('dealer_info')
-          .insert({
-            user_id: session.user.id,
-            dealer_name: validated.dealerName,
-            shop_name: validated.shopName,
-            employee_id: validated.employeeId,
-            phone: validated.phone,
-            address: validated.address,
-            email: validated.email || null,
-            margin: validated.margin
-          });
+         const { error } = await supabase
+           .from('dealer_info')
+           .insert({
+             user_id: session.user.id,
+             dealer_name: formData.name,
+             phone: formData.phone,
+             email: formData.email || null,
+             shop_name: formData.shopName,
+             address: formData.address
+           });
 
         if (error) throw error;
 
         toast({
           title: "Success",
-          description: "Dealer information saved successfully!",
+          description: "Information saved successfully!",
         });
 
-        navigate("/dealer-pricing");
+        navigate("/dashboard");
       }
     } catch (error: any) {
       toast({
-        title: "Validation Error",
+        title: "Error",
         description: error.message || "Please check your inputs and try again.",
         variant: "destructive",
       });
@@ -133,7 +132,7 @@ export default function DealerInfoScreen() {
     }
   };
 
-  const isFormValid = formData.dealerName && formData.shopName && formData.employeeId && formData.phone.length === 10 && formData.margin;
+   const isFormValid = formData.name && formData.phone.length === 10 && formData.shopName && formData.address;
 
   return (
     <div className="min-h-screen bg-background">
@@ -146,66 +145,32 @@ export default function DealerInfoScreen() {
             className="h-8 w-auto object-contain"
           />
           <div>
-            <h1 className="text-xl font-semibold">{isEditMode ? 'Edit Dealer Info' : 'Cosvys Setup'}</h1>
-            <p className="text-white/80 text-sm">Dealer Information</p>
+            <h1 className="text-xl font-semibold">{isEditMode ? 'Edit Information' : 'Cosvys Setup'}</h1>
+            <p className="text-white/80 text-sm">Basic Information</p>
           </div>
         </div>
       </div>
 
       <div className="p-4">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Dealer Details */}
+          {/* Personal Information */}
           <Card className="eca-shadow">
             <CardHeader>
-              <CardTitle className="flex items-center text-lg">
-                <Store className="mr-2 h-5 w-5 text-primary" />
-                Dealer Details
-              </CardTitle>
+              <CardTitle className="text-lg">Personal Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="dealerName" className="text-sm font-medium">
-                  Dealer Name *
+                <Label htmlFor="name" className="text-sm font-medium">
+                  Name *
                 </Label>
                 <Input
-                  id="dealerName"
-                  placeholder="Enter dealer name"
-                  value={formData.dealerName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, dealerName: e.target.value }))}
+                  id="name"
+                  placeholder="Enter your name"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   className="h-12"
                   required
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="shopName" className="text-sm font-medium">
-                  Shop Name *
-                </Label>
-                <Input
-                  id="shopName"
-                  placeholder="Enter shop name"
-                  value={formData.shopName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, shopName: e.target.value }))}
-                  className="h-12"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="employeeId" className="text-sm font-medium">
-                  Dealer Code *
-                </Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                  <Input
-                    id="employeeId"
-                    placeholder="Enter dealer code"
-                    value={formData.employeeId}
-                    onChange={(e) => setFormData(prev => ({ ...prev, employeeId: e.target.value }))}
-                    className="pl-10 h-12"
-                    required
-                  />
-                </div>
               </div>
 
               <div className="space-y-2">
@@ -231,24 +196,8 @@ export default function DealerInfoScreen() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="address" className="text-sm font-medium">
-                  Shop Address
-                </Label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-3 text-muted-foreground h-4 w-4" />
-                  <Textarea
-                    id="address"
-                    placeholder="Enter complete shop address"
-                    value={formData.address}
-                    onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                    className="pl-10 min-h-[80px]"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium">
-                  Dealer Email ID
+                  Email
                 </Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -264,29 +213,44 @@ export default function DealerInfoScreen() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="margin" className="text-sm font-medium">
-                  Dealer Margin *
+                <Label htmlFor="address" className="text-sm font-medium">
+                  Address
                 </Label>
                 <div className="relative">
-                  <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                  <Input
-                    id="margin"
-                    type="number"
-                    placeholder="0"
-                    value={formData.margin}
-                    onChange={(e) => setFormData(prev => ({ ...prev, margin: e.target.value }))}
-                    className="pl-10 h-12"
-                    min="0"
-                    step="0.5"
-                    required
+                  <MapPin className="absolute left-3 top-3 text-muted-foreground h-4 w-4" />
+                  <Textarea
+                    id="address"
+                    placeholder="Enter your address"
+                    value={formData.address}
+                    onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                    className="pl-10 min-h-[80px]"
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Enter percentage. This will be applied to all product pricing.
-                </p>
               </div>
             </CardContent>
           </Card>
+
+          {/* Shop Information */}
+          <Card className="eca-shadow">
+            <CardHeader>
+              <CardTitle className="text-lg">Shop Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="shopName" className="text-sm font-medium">
+                  Shop Name *
+                </Label>
+               <Input
+                   id="shopName"
+                   placeholder="Enter shop name"
+                   value={formData.shopName}
+                   onChange={(e) => setFormData(prev => ({ ...prev, shopName: e.target.value }))}
+                   className="h-12"
+                   required
+                 />
+               </div>
+             </CardContent>
+           </Card>
 
           {/* Submit Button */}
           <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t border-border">
@@ -295,7 +259,7 @@ export default function DealerInfoScreen() {
               className="w-full h-12 text-base font-medium"
               disabled={!isFormValid || loading}
             >
-              {loading ? "Saving..." : isEditMode ? "Update Information" : "Continue to Product Pricing"}
+              {loading ? "Saving..." : isEditMode ? "Update Information" : "Continue"}
             </Button>
           </div>
         </form>

@@ -188,7 +188,8 @@ export default function AddProjectScreen() {
           description: "Project created successfully!",
         });
 
-        navigate(`/site-survey/${newProject.id}`);
+        // After creating a new project, continue to room measurements (skip the site-survey step in front-phase)
+        navigate(`/room-measurement/${newProject.id}`);
       }
     } catch (error: any) {
       console.error('Submit error:', error);

@@ -152,7 +152,7 @@ export default function SettingsScreen() {
               <CardTitle className="flex items-center justify-between text-lg">
                 <div className="flex items-center">
                   <Store className="mr-2 h-5 w-5 text-primary" />
-                  Dealer Information
+                  Personal Information
                 </div>
                 <Button 
                   size="sm" 
@@ -176,18 +176,12 @@ export default function SettingsScreen() {
                 <Phone className="h-4 w-4 text-muted-foreground" />
                 <p className="text-sm">{dealerInfo.phone}</p>
               </div>
-              {dealerInfo.address && (
-                <div className="flex items-center space-x-3">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-sm">{dealerInfo.address}</p>
-                </div>
-              )}
-              {dealerInfo.margin && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Dealer Margin</span>
-                  <Badge variant="outline">{dealerInfo.margin}%</Badge>
-                </div>
-              )}
+               {dealerInfo.address && (
+                 <div className="flex items-center space-x-3">
+                   <MapPin className="h-4 w-4 text-muted-foreground" />
+                   <p className="text-sm">{dealerInfo.address}</p>
+                 </div>
+               )}
             </CardContent>
           </Card>
         )}

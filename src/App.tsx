@@ -14,11 +14,8 @@ const DealerPricingScreen = lazy(() => import("./components/DealerPricingScreen"
 const CoverageDataScreen = lazy(() => import("./components/CoverageDataScreen"));
 const Dashboard = lazy(() => import("./components/Dashboard"));
 const AddProjectScreen = lazy(() => import("./components/AddProjectScreen"));
-const AboutSiteSurveyScreen = lazy(() => import("./components/AboutSiteSurveyScreen"));
 const RoomMeasurementScreen = lazy(() => import("./components/RoomMeasurementScreen"));
 const PaintEstimationScreen = lazy(() => import("./components/PaintEstimationScreen"));
-const ProjectSummaryScreen = lazy(() => import("./components/ProjectSummaryScreen"));
-const GenerateSummaryScreen = lazy(() => import("./components/GenerateSummaryScreen"));
 const SavedProjectsScreen = lazy(() => import("./components/SavedProjectsScreen"));
 const SettingsScreen = lazy(() => import("./components/SettingsScreen"));
 const ProjectDetailsPage = lazy(() => import("./components/ProjectDetailsPage"));
@@ -60,14 +57,11 @@ const App = () => {
               <Route path="/dealer-info" element={<DealerInfoScreen />} />
               <Route path="/dealer-pricing" element={<DealerPricingScreen />} />
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/add-project" element={<AddProjectScreen />} />
-              <Route path="/site-survey/:projectId" element={<AboutSiteSurveyScreen />} />
-              <Route path="/project-details" element={<ProjectDetailsPage />} />
-              <Route path="/room-measurement/:projectId" element={<RoomMeasurementScreen />} />
-              <Route path="/paint-estimation/:projectId" element={<PaintEstimationScreen />} />
-              <Route path="/project-summary/:projectId" element={<ProjectSummaryScreen />} />
-              <Route path="/generate-summary/:projectId" element={<GenerateSummaryScreen />} />
-              <Route path="/saved-projects" element={<SavedProjectsScreen />} />
+               <Route path="/add-project" element={<AddProjectScreen />} />
+               <Route path="/project-details" element={<ProjectDetailsPage />} />
+               <Route path="/room-measurement/:projectId" element={<RoomMeasurementScreen />} />
+               <Route path="/paint-estimation/:projectId" element={<PaintEstimationScreen />} />
+               <Route path="/saved-projects" element={<SavedProjectsScreen />} />
               <Route path="/lead-book" element={<LeadBookScreen />} />
               <Route path="/coverage-data" element={<CoverageDataScreen />} />
               <Route path="/settings" element={<SettingsScreen />} />
